@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Symmetric Brawlhalla Rank Visualizer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rank Calculator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Lato:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -23,11 +23,10 @@
 
         body {
             margin: 0;
-            overflow: hidden; /* Prevent scroll on mobile drag */
+            overflow: hidden;
             background-color: #050508; /* Darker background */
             color: white;
             font-family: var(--font-body);
-            touch-action: none; /* Disable default touch actions to prioritize app gestures */
         }
 
         #bg-canvas {
@@ -57,15 +56,11 @@
             justify-content: center;
             height: 100vh;
             width: 100vw;
-            padding: 20px 0; /* Safety padding for mobile notches */
         }
 
         .rank-card {
-            width: 90vw; /* Responsive width */
-            max-width: 380px;
-            height: 85vh; /* Responsive height */
-            max-height: 700px;
-            min-height: 550px;
+            width: 380px;
+            height: 700px;
             background: rgba(15, 15, 20, 0.9);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 20px;
@@ -76,7 +71,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 2rem 1.5rem; /* Slightly reduced padding for mobile */
+            padding: 2.5rem 2rem;
             transition: transform 0.1s ease-out, border-color 0.5s ease, box-shadow 0.5s ease;
             transform-style: preserve-3d;
             position: relative;
@@ -96,12 +91,10 @@
             transition: background 0.5s ease;
         }
 
-        /* Rank Icon Container - Responsive */
+        /* Rank Icon Container */
         .icon-container {
-            width: 60vw; /* Scale relative to viewport */
-            height: 60vw;
-            max-width: 260px;
-            max-height: 260px;
+            width: 260px;
+            height: 260px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -109,7 +102,6 @@
             transition: filter 0.5s ease;
             z-index: 2;
             margin-bottom: 10px;
-            flex-shrink: 0; /* Prevent squashing on short screens */
         }
 
         .icon-container svg {
@@ -129,7 +121,6 @@
             margin-bottom: 1.5rem;
             z-index: 20;
             width: 100%;
-            flex-shrink: 0;
         }
 
         .elo-label {
@@ -196,7 +187,7 @@
         }
 
         .custom-checkbox:checked::after {
-            content: '✓';
+            content: '?';
             position: absolute;
             color: white;
             font-size: 12px;
@@ -210,12 +201,11 @@
             background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
             border-top: 1px solid rgba(255,255,255,0.1);
             border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding: 0.8rem 0;
+            padding: 1rem 0;
             text-align: center;
             position: relative;
             z-index: 2;
             transition: opacity 0.5s ease;
-            flex-shrink: 0;
         }
         
         .wins-calculator.hidden-state {
@@ -244,7 +234,7 @@
         }
 
         .wins-count {
-            font-size: clamp(2rem, 5vw, 2.5rem); /* Responsive font size */
+            font-size: 2.5rem;
             font-weight: 900;
             color: #fff;
             text-shadow: 0 0 20px var(--glow-color);
@@ -272,18 +262,16 @@
             z-index: 2;
             display: flex;
             justify-content: center;
-            padding-bottom: 10px;
         }
 
         input[type=range] {
             -webkit-appearance: none;
-            width: 90%; 
+            width: 90%; /* Not full width to keep centered look */
             height: 4px;
             background: rgba(255,255,255,0.1);
             border-radius: 5px;
             outline: none;
             transition: opacity 0.3s;
-            cursor: pointer;
         }
         
         /* Dim slider when unranked */
@@ -293,34 +281,13 @@
 
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 24px; /* Larger target for touch */
-            height: 24px;
+            width: 16px;
+            height: 16px;
             background: #fff;
             cursor: pointer;
             border-radius: 50%;
             box-shadow: 0 0 10px rgba(255,255,255,0.8);
             transition: transform 0.2s, background 0.3s;
-            margin-top: -10px; /* Center alignment fix for webkit */
-        }
-        
-        /* Firefox Thumb */
-        input[type=range]::-moz-range-thumb {
-            width: 24px;
-            height: 24px;
-            background: #fff;
-            cursor: pointer;
-            border-radius: 50%;
-            box-shadow: 0 0 10px rgba(255,255,255,0.8);
-            transition: transform 0.2s, background 0.3s;
-            border: none;
-        }
-        
-        /* Standard Track Fixes for Alignment */
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: transparent;
         }
 
         input[type=range]::-webkit-slider-thumb:hover {
@@ -330,12 +297,11 @@
         /* Progress Bar - Centered Labels */
         .progress-container {
             width: 100%;
-            margin-top: 1rem;
+            margin-top: 1.5rem;
             display: flex;
             flex-direction: column;
             align-items: center;
             transition: opacity 0.5s ease;
-            flex-shrink: 0;
         }
         
         .progress-container.hidden-state {
@@ -445,7 +411,7 @@
 
     <div class="app-container">
         
-        <div class="absolute top-8 text-center z-20 pointer-events-none">
+        <div class="absolute top-8 text-center z-20">
             <h2 class="text-white/40 text-xs tracking-[0.5em] font-body uppercase mb-1">Rank Calculator</h2>
             <div class="h-px w-24 bg-gradient-to-r from-transparent via-white/30 to-transparent mx-auto"></div>
         </div>
@@ -818,45 +784,21 @@
         eloInput.addEventListener('focus', () => { triggerInteraction(); }); // Trigger on click
         winsCheck.addEventListener('change', () => updateRank('input'));
 
-        // --- 3D Tilt Effect & Mobile Touch ---
-        
-        const updateTilt = (x, y, rect) => {
+        // --- 3D Tilt Effect ---
+        rankCard.addEventListener('mousemove', (e) => {
+            const rect = rankCard.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
             const centerX = rect.width / 2;
             const centerY = rect.height / 2;
             const rotateX = ((y - centerY) / centerY) * -3; 
             const rotateY = ((x - centerX) / centerX) * 3;
             rankCard.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-        };
-
-        const resetTilt = () => {
-             rankCard.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg)`;
-        };
-
-        rankCard.addEventListener('mousemove', (e) => {
-            const rect = rankCard.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            updateTilt(x, y, rect);
         });
 
-        rankCard.addEventListener('mouseleave', resetTilt);
-
-        // Mobile Touch Events
-        rankCard.addEventListener('touchmove', (e) => {
-            e.preventDefault(); // Prevent scroll while tilting
-            const touch = e.touches[0];
-            const rect = rankCard.getBoundingClientRect();
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
-            
-            // Boundary check to ensure we only tilt while finger is somewhat on card
-            if (x >= 0 && x <= rect.width && y >= 0 && y <= rect.height) {
-                updateTilt(x, y, rect);
-            }
-        }, { passive: false });
-
-        rankCard.addEventListener('touchend', resetTilt);
-
+        rankCard.addEventListener('mouseleave', () => {
+            rankCard.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg)`;
+        });
 
         // --- Background Particles ---
         const canvas = document.getElementById('bg-canvas');
@@ -916,4 +858,5 @@
 
     </script>
 </body>
+
 </html>
