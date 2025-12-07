@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symmetric Brawlhalla Rank Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom Font Variables */
+        :root {
+            --font-display: 'Cinzel', serif;
+            --font-body: 'Lato', sans-serif;
+            --color-tin: #2f3e30;
+            --color-bronze: #5c3c1e;
+            --color-silver: #4b5563;
+            --color-gold: #7f1d1d;
+            --color-platinum: #1e3a8a;
+            --color-diamond: #4c1d95;
+            --color-valhallan: #0e7490;
+            --glow-color: rgba(255, 255, 255, 0.2); /* Default glow */
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050508; /* Darker background */
+            color: white;
+            font-family: var(--font-body);
+        }
+
+        #bg-canvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0;
+            opacity: 0.4;
+        }
+
+        /* Cinematic Vignette & Spotlight */
+        .lighting-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+            background: 
+                radial-gradient(circle at 50% 0%, rgba(255,255,255,0.08) 0%, transparent 50%), /* Top spotlight */
+                radial-gradient(circle at 50% 50%, transparent 40%, #000 100%); /* Vignette */
+            pointer-events: none;
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .rank-card {
+            width: 380px;
+            height: 700px;
+            background: rgba(15, 15, 20, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            box-shadow: 
+                0 0 0 1px rgba(255, 255, 255, 0.05), /* Inner rim */
+                0 20px 50px rgba(0, 0, 0, 0.8), /* Deep shadow */
+                0 0 30px var(--glow-color); /* Ambient glow */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2.5rem 2rem;
+            transition: transform 0.1s ease-out, border-color 0.5s ease, box-shadow 0.5s ease;
+            transform-style: preserve-3d;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Ambient internal glow */
+        .rank-card::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle at center, var(--glow-color) 0%, transparent 70%);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+            transition: background 0.5s ease;
+        }
+
+        /* Rank Icon Container */
+        .icon-container {
+            width: 260px;
+            height: 260px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 0 15px var(--glow-color));
+            transition: filter 0.5s ease;
+            z-index: 2;
+            margin-bottom: 10px;
+        }
+
+        .icon-container svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        /* Input Group - STACKED FOR SYMMETRY */
+        .elo-input-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 0.5rem;
+            margin-bottom: 1.5rem;
+            z-index: 20;
+            width: 100%;
+        }
+
+        .elo-label {
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            color: rgba(255,255,255,0.5);
+            font-weight: 700;
+        }
+
+        .elo-input {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            padding: 8px 0;
+            border-radius: 6px;
+            width: 120px;
+            text-align: center;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.4rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .elo-input:focus {
+            border-color: var(--glow-color);
+            box-shadow: 0 0 15px var(--glow-color);
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        /* Valhallan Toggle Checkbox */
+        .valhallan-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            height: 0;
+            overflow: hidden;
+        }
+        
+        .valhallan-toggle.visible {
+            opacity: 1;
+            pointer-events: auto;
+            height: auto;
+        }
+
+        .custom-checkbox {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid var(--glow-color);
+            border-radius: 3px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .custom-checkbox:checked {
+            background: var(--glow-color);
+        }
+
+        .custom-checkbox:checked::after {
+            content: '?';
+            position: absolute;
+            color: white;
+            font-size: 12px;
+            left: 2px;
+            top: -2px;
+        }
+
+        /* Wins Calculator Box - SYMMETRIC BORDERS */
+        .wins-calculator {
+            width: 100%;
+            background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+            border-top: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 1rem 0;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+            transition: opacity 0.5s ease;
+        }
+        
+        .wins-calculator.hidden-state {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Left Bar */
+        .wins-calculator::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 3px; height: 100%;
+            background: var(--glow-color);
+            box-shadow: 2px 0 10px var(--glow-color);
+            transition: background 0.3s;
+        }
+
+        /* Right Bar - Added for symmetry */
+        .wins-calculator::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; width: 3px; height: 100%;
+            background: var(--glow-color);
+            box-shadow: -2px 0 10px var(--glow-color);
+            transition: background 0.3s;
+        }
+
+        .wins-count {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 20px var(--glow-color);
+            line-height: 1;
+            font-family: var(--font-display);
+        }
+
+        .wins-subtext {
+            font-size: 0.7rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 8px;
+        }
+
+        .next-rank-name {
+            color: var(--glow-color);
+            font-weight: bold;
+        }
+
+        /* Slider */
+        .slider-container {
+            width: 100%;
+            margin-top: auto;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 90%; /* Not full width to keep centered look */
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            outline: none;
+            transition: opacity 0.3s;
+        }
+        
+        /* Dim slider when unranked */
+        input[type=range].unranked {
+            opacity: 0.3;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255,255,255,0.8);
+            transition: transform 0.2s, background 0.3s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+        }
+
+        /* Progress Bar - Centered Labels */
+        .progress-container {
+            width: 100%;
+            margin-top: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: opacity 0.5s ease;
+        }
+        
+        .progress-container.hidden-state {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .progress-labels {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            padding: 0 2px;
+        }
+
+        .progress-wrapper {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 2px;
+            position: relative;
+            overflow: hidden;
+            z-index: 2;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--glow-color) 0%, #fff 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 15px var(--glow-color);
+        }
+
+        /* Animations */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        @keyframes breathe {
+            0% { box-shadow: 0 0 10px rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.05); }
+            50% { box-shadow: 0 0 25px rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.15); }
+            100% { box-shadow: 0 0 10px rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.05); }
+        }
+
+        @keyframes glassShine {
+            0% { transform: translateX(-150%) skewX(-25deg); }
+            50% { transform: translateX(150%) skewX(-25deg); }
+            100% { transform: translateX(150%) skewX(-25deg); }
+        }
+
+        .floating {
+            animation: float 5s ease-in-out infinite;
+        }
+        
+        /* Specific breathing animation for unranked card state */
+        .rank-card.unranked-mode {
+            animation: breathe 4s ease-in-out infinite;
+        }
+
+        /* Glass Reflection Overlay for Unranked */
+        .glass-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        
+        .rank-card.unranked-mode .glass-overlay {
+            opacity: 1;
+        }
+
+        .glass-shine-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg, 
+                transparent 0%, 
+                rgba(255, 255, 255, 0.05) 45%, 
+                rgba(255, 255, 255, 0.2) 50%, 
+                rgba(255, 255, 255, 0.05) 55%, 
+                transparent 100%
+            );
+            filter: blur(5px);
+            animation: glassShine 6s ease-in-out infinite;
+        }
+
+        /* Number input clean up */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="lighting-overlay"></div>
+
+    <div class="app-container">
+        
+        <div class="absolute top-8 text-center z-20">
+            <h2 class="text-white/40 text-xs tracking-[0.5em] font-body uppercase mb-1">Rank Calculator</h2>
+            <div class="h-px w-24 bg-gradient-to-r from-transparent via-white/30 to-transparent mx-auto"></div>
+        </div>
+
+        <div class="rank-card" id="rankCard">
+            
+            <!-- Added Glass Overlay -->
+            <div class="glass-overlay">
+                <div class="glass-shine-bar"></div>
+            </div>
+
+            <div class="icon-container floating" id="rankIcon">
+                <!-- SVG injected here -->
+            </div>
+            
+            <div class="elo-input-group">
+                <label for="eloInput" class="elo-label">Current ELO</label>
+                <input type="number" id="eloInput" class="elo-input" placeholder="0" min="200" max="3000">
+                
+                <div class="valhallan-toggle" id="valhallanToggle">
+                    <input type="checkbox" id="winsCheck" class="custom-checkbox">
+                    <label for="winsCheck" class="text-[10px] uppercase tracking-widest text-white/70 font-bold cursor-pointer hover:text-white transition-colors">100+ Season Wins</label>
+                </div>
+            </div>
+
+            <div class="wins-calculator hidden-state" id="winsCalculator">
+                <div class="wins-count" id="winsCount">0</div>
+                <div class="wins-subtext" id="winsText">Games to Rank Up</div>
+            </div>
+
+            <div class="mt-auto w-full">
+                <div class="progress-container hidden-state" id="progressContainer">
+                    <div class="progress-labels">
+                        <span class="text-[10px] text-white/30 uppercase tracking-widest font-bold">Next Rank</span>
+                        <span class="text-[10px] text-white/60 font-mono" id="progressText">0%</span>
+                    </div>
+                    <div class="progress-wrapper">
+                        <div class="progress-fill" id="progressBar"></div>
+                    </div>
+                </div>
+
+                <div class="slider-container mt-6">
+                    <input type="range" min="200" max="2500" value="200" id="eloSlider" class="unranked">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Game Logic ---
+        const ranks = [
+            { name: "Tin", min: 200, color: "#2f3e30", accent: "#718096" },
+            { name: "Bronze", min: 910, color: "#5c3c1e", accent: "#d69e2e" },
+            { name: "Silver", min: 1130, color: "#4b5563", accent: "#cbd5e1" },
+            { name: "Gold", min: 1390, color: "#7f1d1d", accent: "#f59e0b" },
+            { name: "Platinum", min: 1680, color: "#1e3a8a", accent: "#60a5fa" },
+            { name: "Diamond", min: 2000, color: "#4c1d95", accent: "#c084fc" }
+        ];
+
+        const VALHALLAN_RANK = { name: "Valhallan", min: 2000, color: "#0e7490", accent: "#22d3ee" };
+        const UNRANKED_COLOR = "rgba(255, 255, 255, 0.1)";
+
+        const slider = document.getElementById('eloSlider');
+        const eloInput = document.getElementById('eloInput');
+        const winsCheck = document.getElementById('winsCheck');
+        const valhallanToggle = document.getElementById('valhallanToggle');
+        
+        const rankCard = document.getElementById('rankCard');
+        const rankIconContainer = document.getElementById('rankIcon');
+        const winsCalculator = document.getElementById('winsCalculator');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const winsCountDisplay = document.getElementById('winsCount');
+        const winsTextDisplay = document.getElementById('winsText');
+        const AVG_ELO_WIN = 15;
+
+        // State to track if user has interacted
+        let hasInteracted = false;
+
+        // --- SYMMETRIC SVG GENERATOR ---
+        const generateSVG = (rank, color, accent, isUnknown = false) => {
+            const defs = `
+                <defs>
+                    <linearGradient id="grad${isUnknown ? 'Unknown' : rank}" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:${color};stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#0f0f12;stop-opacity:1" />
+                    </linearGradient>
+                    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="#FDB931"/>
+                        <stop offset="50%" stop-color="#FFF8DC"/>
+                        <stop offset="100%" stop-color="#FDB931"/>
+                    </linearGradient>
+                    <filter id="shadow">
+                        <feDropShadow dx="0" dy="5" stdDeviation="5" flood-opacity="0.5"/>
+                    </filter>
+                    <filter id="glow">
+                         <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                         <feMerge>
+                             <feMergeNode in="coloredBlur"/>
+                             <feMergeNode in="SourceGraphic"/>
+                         </feMerge>
+                    </filter>
+                </defs>`;
+
+            // Perfectly Symmetric Banner Shape
+            const bannerPath = `M50,20 L250,20 L250,220 L150,280 L50,220 Z`;
+            const bannerTopBar = `<rect x="55" y="15" width="190" height="4" fill="rgba(255,255,255,0.3)" rx="2" />`;
+
+            if (isUnknown) {
+                 const unknownDefs = `
+                    <defs>
+                        <linearGradient id="gradUnknown" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style="stop-color:#1a1a20;stop-opacity:1" />
+                            <stop offset="50%" style="stop-color:#252530;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#101015;stop-opacity:1" />
+                        </linearGradient>
+                        <filter id="pulseGlow">
+                            <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+                            <feMerge>
+                                <feMergeNode in="coloredBlur"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                    </defs>
+                 `;
+                 // Animated Rune Portal Concept to fill space
+                return `<svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+                    ${unknownDefs}
+                    <g filter="url(#shadow)">
+                        <!-- Darker, mysterious banner -->
+                        <path d="${bannerPath}" fill="url(#gradUnknown)" stroke="rgba(255,255,255,0.1)" stroke-width="1.5" />
+                        ${bannerTopBar}
+                        
+                        <!-- READY text with cinematic letter spacing -->
+                        <text x="150" y="200" font-family="Cinzel, serif" font-size="20" font-weight="900" fill="rgba(255,255,255,0.2)" text-anchor="middle" letter-spacing="6">READY</text>
+                        
+                        <!-- Magic Rune Portal -->
+                        <g transform="translate(150, 75)">
+                            <!-- Rotating Outer Ring -->
+                            <g>
+                                <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="20s" repeatCount="indefinite" />
+                                <circle cx="0" cy="0" r="45" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="10, 5" />
+                                <circle cx="0" cy="0" r="40" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="0.5" />
+                            </g>
+                            
+                            <!-- Rotating Inner Ring (Reverse) -->
+                            <g>
+                                <animateTransform attributeName="transform" type="rotate" from="360 0 0" to="0 0 0" dur="15s" repeatCount="indefinite" />
+                                <circle cx="0" cy="0" r="25" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2" stroke-dasharray="5, 5" />
+                                <rect x="-15" y="-15" width="30" height="30" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1" transform="rotate(45)" />
+                            </g>
+                            
+                            <!-- Pulsing Core -->
+                            <circle cx="0" cy="0" r="8" fill="rgba(255,255,255,0.8)" filter="url(#pulseGlow)">
+                                <animate attributeName="opacity" values="0.3;0.8;0.3" dur="3s" repeatCount="indefinite" />
+                                <animate attributeName="r" values="8;10;8" dur="3s" repeatCount="indefinite" />
+                            </circle>
+                        </g>
+                    </g>
+                </svg>`;
+            }
+
+            let icon = '';
+            let titleFill = "#fff";
+            
+            // Rank Title Text Styling
+            if(rank === "Gold" || rank === "Valhallan") titleFill = "url(#goldGrad)";
+            
+            // Dynamic Font Size
+            let fontSize = 28;
+            let letterSpacing = 4;
+            
+            if (rank.length > 7) {
+                fontSize = 22; 
+                letterSpacing = 2;
+            } else if (rank.length > 5) {
+                fontSize = 25;
+                letterSpacing = 3;
+            }
+
+            let titleText = `<text x="150" y="200" font-family="Cinzel, serif" font-size="${fontSize}" font-weight="900" fill="${titleFill}" text-anchor="middle" letter-spacing="${letterSpacing}" filter="url(#shadow)">${rank.toUpperCase()}</text>`;
+
+            // --- SYMMETRIC ICON PATHS ---
+            if (rank === 'Tin') {
+                icon = `
+                    <path d="M150,30 L180,60 L150,90 L120,60 Z" fill="${accent}" opacity="0.8"/>
+                    <path d="M110,50 L130,30 L140,50 L120,80 Z" fill="${accent}" opacity="0.4"/>
+                    <path d="M190,50 L170,30 L160,50 L180,80 Z" fill="${accent}" opacity="0.4"/>
+                `;
+            } else if (rank === 'Bronze') {
+                icon = `
+                    <path d="M150,20 L150,110" stroke="${accent}" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M150,40 Q110,20 100,70 Q120,80 150,60" fill="${accent}"/>
+                    <path d="M150,40 Q190,20 200,70 Q180,80 150,60" fill="${accent}"/>
+                `;
+            } else if (rank === 'Silver') {
+                icon = `
+                    <path d="M150,110 L150,20" stroke="${accent}" stroke-width="3"/>
+                    <path d="M130,40 L170,40" stroke="${accent}" stroke-width="3" stroke-linecap="round"/>
+                    <path d="M150,20 L140,40 L150,90 L160,40 Z" fill="${accent}"/>
+                    <circle cx="150" cy="40" r="4" fill="#000"/>
+                `;
+            } else if (rank === 'Gold') {
+                icon = `
+                    <path d="M110,60 L110,40 L130,80 L150,30 L170,80 L190,40 L190,60 L150,100 Z" fill="url(#goldGrad)"/>
+                    <circle cx="110" cy="35" r="3" fill="#fff" filter="url(#glow)"/>
+                    <circle cx="190" cy="35" r="3" fill="#fff" filter="url(#glow)"/>
+                    <circle cx="150" cy="25" r="4" fill="#fff" filter="url(#glow)"/>
+                `;
+            } else if (rank === 'Platinum') {
+                icon = `
+                    <path d="M150,80 Q140,20 90,30 Q110,60 120,90 Z" fill="${accent}"/>
+                    <path d="M150,80 Q160,20 210,30 Q190,60 180,90 Z" fill="${accent}"/>
+                    <circle cx="150" cy="80" r="5" fill="#fff" filter="url(#glow)"/>
+                    <path d="M150,80 L150,20" stroke="${accent}" stroke-width="1" stroke-dasharray="2,2"/>
+                `;
+            } else if (rank === 'Diamond') {
+                icon = `
+                    <path d="M150,20 L190,50 L150,100 L110,50 Z" fill="${accent}" stroke="#fff" stroke-width="1"/>
+                    <path d="M110,50 L190,50" stroke="#fff" stroke-width="0.5" opacity="0.5"/>
+                    <path d="M150,20 L150,100" stroke="#fff" stroke-width="0.5" opacity="0.5"/>
+                    <path d="M150,50 L170,35 M150,50 L130,35" stroke="#fff" stroke-width="0.5" opacity="0.5"/>
+                `;
+            } else if (rank === 'Valhallan') {
+                icon = `
+                    <path d="M100,30 L150,10 L200,30" fill="none" stroke="url(#goldGrad)" stroke-width="2"/>
+                    <path d="M150,10 L150,110" stroke="${accent}" stroke-width="2"/>
+                    <path d="M150,40 L120,70 M150,40 L180,70" stroke="${accent}" stroke-width="2"/>
+                    <circle cx="150" cy="40" r="6" fill="#fff" filter="url(#glow)"/>
+                    <path d="M150,10 L120,10 M150,10 L180,10" stroke="url(#goldGrad)" stroke-width="2"/>
+                `;
+            }
+
+            return `<svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+                ${defs}
+                <g filter="url(#shadow)">
+                    <path d="${bannerPath}" fill="url(#grad${rank})" stroke="${accent}" stroke-width="1.5" />
+                    ${bannerTopBar}
+                    ${titleText}
+                    <g transform="translate(0, 30)">
+                        ${icon}
+                    </g>
+                </g>
+            </svg>`;
+        };
+
+        const initUnrankedState = () => {
+            rankIconContainer.innerHTML = generateSVG(null, null, null, true);
+            rankCard.style.borderColor = "rgba(255,255,255,0.05)";
+            rankCard.classList.add('unranked-mode'); // Enable breathing animation
+            document.documentElement.style.setProperty('--glow-color', "rgba(255,255,255,0.1)");
+            winsCalculator.classList.add('hidden-state');
+            progressContainer.classList.add('hidden-state');
+            slider.classList.add('unranked');
+            // Ensure inputs are visually empty/default
+            eloInput.value = "";
+        }
+
+        const triggerInteraction = () => {
+            if (!hasInteracted) {
+                hasInteracted = true;
+                rankCard.classList.remove('unranked-mode');
+                winsCalculator.classList.remove('hidden-state');
+                progressContainer.classList.remove('hidden-state');
+                slider.classList.remove('unranked');
+                // Set default if empty on first interaction via slider
+                if (eloInput.value === "") eloInput.value = slider.value;
+                updateRank('slider'); // Force initial update
+            }
+        }
+
+        const updateRank = (source = 'slider') => {
+            if (!hasInteracted) return;
+
+            let elo;
+            
+            if (source === 'slider') {
+                elo = parseInt(slider.value);
+                eloInput.value = elo;
+            } else {
+                elo = parseInt(eloInput.value);
+                if (isNaN(elo)) elo = 200; // default for math logic
+                // Don't update slider if the input is empty or invalid during typing,
+                // but we need a valid number for logic.
+                if(elo <= 2500) slider.value = elo;
+            }
+
+            let currentRank = ranks[0];
+            let nextRank = null;
+            let isValhallan = false;
+
+            // Find Range
+            for (let i = 0; i < ranks.length; i++) {
+                if (elo >= ranks[i].min) {
+                    currentRank = ranks[i];
+                    nextRank = (ranks[i+1]) ? ranks[i+1] : null;
+                }
+            }
+
+            // Valhallan Logic
+            if (currentRank.name === "Diamond") {
+                valhallanToggle.classList.add('visible');
+                if (winsCheck.checked) {
+                    currentRank = VALHALLAN_RANK;
+                    isValhallan = true;
+                    nextRank = null;
+                } else {
+                    nextRank = VALHALLAN_RANK;
+                }
+            } else {
+                valhallanToggle.classList.remove('visible');
+                winsCheck.checked = false;
+            }
+
+            // Update Colors
+            rankCard.style.borderColor = `rgba(${hexToRgb(currentRank.accent)}, 0.4)`; // Increased opacity for cinematic look
+            document.documentElement.style.setProperty('--glow-color', currentRank.accent);
+            
+            // Generate Symmetric SVG
+            rankIconContainer.innerHTML = generateSVG(currentRank.name, currentRank.color, currentRank.accent);
+
+            // Progress Logic
+            let percentage = 100;
+            if (nextRank) {
+                if (currentRank.name === "Diamond" && nextRank.name === "Valhallan") {
+                    percentage = 0; 
+                    progressText.innerText = "WINS REQ";
+                } else {
+                    const range = nextRank.min - currentRank.min;
+                    const progress = elo - currentRank.min;
+                    percentage = (progress / range) * 100;
+                    if (percentage > 100) percentage = 100;
+                    if (percentage < 0) percentage = 0;
+                    progressText.innerText = `${Math.round(percentage)}%`;
+                }
+            } else {
+                progressText.innerText = "MAX";
+            }
+            
+            progressBar.style.width = `${percentage}%`;
+            
+            
+            if (nextRank) {
+                if (nextRank.name === "Valhallan") {
+                    winsCountDisplay.innerText = "100";
+                    winsTextDisplay.innerHTML = `Wins needed for <span class="next-rank-name" style="color:${nextRank.accent}">${nextRank.name}</span>`;
+                } else {
+                    const eloDiff = nextRank.min - elo;
+                    const winsNeeded = Math.ceil(eloDiff / AVG_ELO_WIN);
+                    winsCountDisplay.innerText = Math.max(0, winsNeeded);
+                    winsTextDisplay.innerHTML = `Wins to <span class="next-rank-name" style="color:${nextRank.accent}">${nextRank.name}</span>`;
+                }
+            } else {
+                winsCountDisplay.innerText = "TOP";
+                // UPDATED HERE:
+                winsTextDisplay.innerText = "Fallen Valhallan";
+            }
+        };
+
+        // Helper for RGBA conversion
+        function hexToRgb(hex) {
+            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255,255,255';
+        }
+
+        slider.addEventListener('input', () => { triggerInteraction(); updateRank('slider'); });
+        eloInput.addEventListener('input', () => { triggerInteraction(); updateRank('input'); });
+        eloInput.addEventListener('focus', () => { triggerInteraction(); }); // Trigger on click
+        winsCheck.addEventListener('change', () => updateRank('input'));
+
+        // --- 3D Tilt Effect ---
+        rankCard.addEventListener('mousemove', (e) => {
+            const rect = rankCard.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const rotateX = ((y - centerY) / centerY) * -3; 
+            const rotateY = ((x - centerX) / centerX) * 3;
+            rankCard.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        });
+
+        rankCard.addEventListener('mouseleave', () => {
+            rankCard.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg)`;
+        });
+
+        // --- Background Particles ---
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        
+        const resizeCanvas = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = (Math.random() - 0.5) * 0.1; // Slower for cinematic feel
+                this.speedY = (Math.random() - 0.5) * 0.1;
+                this.alpha = Math.random() * 0.5 + 0.1;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+            }
+            draw() {
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        const initParticles = () => {
+            particles = [];
+            for (let i = 0; i < 60; i++) particles.push(new Particle());
+        };
+
+        const animateParticles = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for(let p of particles) {
+                p.update();
+                p.draw();
+            }
+            requestAnimationFrame(animateParticles);
+        };
+
+        initParticles();
+        animateParticles();
+        
+        // Init state
+        initUnrankedState();
+
+    </script>
+</body>
+</html>
